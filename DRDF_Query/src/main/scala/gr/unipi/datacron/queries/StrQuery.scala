@@ -7,22 +7,27 @@ import org.apache.spark.RangePartitioner
 import gr.unipi.datacron.common.ArrayUtils._
 import gr.unipi.datacron.encoding._
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
+import org.apache.spark.sql.types._
+
 
 class StrQuery(config: Config) extends BaseQuery(config) {
   
   val qDetails = new QueryInfo(config)
-  
-  private def filterByIdInfo(rdd: RDD[String]): RDD[((Int, Long), String)] = {
-  
+
+  private def filterByIdInfo(dataset: Dataset[String], spark: SparkSession ): Dataset[((Int, Long), String)] = {
+
+    import spark.implicits._
+
     val intervalIds = data.temporalGrid.getIntervalIds(qDetails.qTimeLower, qDetails.qTimeUpper)
     val spatialIds = data.spatialGrid.getSpatialIds((qDetails.qLatLower, qDetails.qLonLower), (qDetails.qLatUpper, qDetails.qLonUpper))
     val encoder = new SimpleEncoder(config)
-    
-    val result = rdd.map(x => {
+
+    val result = dataset.map(x => {
       val id = x.substring(0, x.indexOf(Consts.tripleFieldsSeparator)).toLong
       val components = encoder.decodeComponentsFromKey(id)
       //println(components)
-      
+
       //Possible key values:
       // -1: pruned by either temporal or spatial
       //  0: definitely a result triple (does not need refinement)
@@ -46,16 +51,20 @@ class StrQuery(config: Config) extends BaseQuery(config) {
           }
         }
       }
-      
+
       ((key, id), x)
     }).filter(_._1._1 != -1)
     return result
   }
-  
-  private def refineResult(qDetails: QueryInfo, rdd: RDD[((Int, Long), String)], soForTemporalRefinement: scala.collection.Map[Long, String],
-      soForSpatialRefinement: scala.collection.Map[Long, String]): RDD[(Boolean, String)] = {
+
+  private def refineResult(qDetails: QueryInfo, dataset: Dataset[((Int, Long), String)],
+                           soForTemporalRefinement: scala.collection.Map[Long, String],
+                           soForSpatialRefinement: scala.collection.Map[Long, String],
+                           spark: SparkSession): Dataset[(Boolean, String)] = {
+
+    import spark.implicits._
     
-    val result = rdd.map(kv => {
+    val result = dataset.map(kv => {
       var tmpResult = ((kv._1._1 >> 0) & 1) != 1
       var sptResult = ((kv._1._1 >> 1) & 1) != 1
       
@@ -87,7 +96,7 @@ class StrQuery(config: Config) extends BaseQuery(config) {
     return result
   }
 
-  override def executeQuery(): Boolean = {
+  def executeQuery(spark: SparkSession): Boolean = {
     val triple = new SPO(
       config.getString(Consts.qfpTripleS),
       config.getString(Consts.qfpTripleP),
@@ -97,7 +106,7 @@ class StrQuery(config: Config) extends BaseQuery(config) {
     val filteredSPO = data.triplesData.filter(searchStr.matches(_))
     println(filteredSPO.count)
     
-    val filteredByIdInfo = filterByIdInfo(filteredSPO)
+    val filteredByIdInfo = filterByIdInfo(filteredSPO,spark)
     println(filteredByIdInfo.count)
     
     val encodedUriMBR = data.dictionary.getIdByValue(Consts.uriMBR)
@@ -120,7 +129,7 @@ class StrQuery(config: Config) extends BaseQuery(config) {
     val soForSpatialRefinementDecoded = data.dictionary.getValuesListByIdsList(soForSpatialRefinementEncoded)
     println(soForSpatialRefinementDecoded.size)
     
-    val result = refineResult(qDetails, filteredByIdInfo, soForTemporalRefinementDecoded, soForSpatialRefinementDecoded)
+    val result = refineResult(qDetails, filteredByIdInfo, soForTemporalRefinementDecoded, soForSpatialRefinementDecoded,spark)
     println(result.count)
     
     
