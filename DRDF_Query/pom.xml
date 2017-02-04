@@ -40,7 +40,7 @@
       <artifactId>uzaygezen-core</artifactId>
       <version>0.2</version>
     </dependency>
-    
+
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${spark.compat.version}</artifactId>
@@ -86,7 +86,6 @@
             </goals>
             <configuration>
               <args>
-                <arg>-make:transitive</arg>
                 <arg>-dependencyfile</arg>
                 <arg>${project.build.directory}/.scala_dependencies</arg>
               </args>
