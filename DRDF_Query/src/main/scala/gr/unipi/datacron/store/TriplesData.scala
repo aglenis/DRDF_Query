@@ -5,9 +5,12 @@ import gr.unipi.datacron.common._
 import gr.unipi.datacron.common.RegexUtils._
 import org.apache.spark.sql.SparkSession
 
-class TriplesData(config: Config, expData: ExpData,session: SparkSession) {
+class TriplesData(config: Config, expData: ExpData,spark: SparkSession) {
   //val data = expData.hdfs.sc.textFile(config.getString(Consts.qfpTriplesPath))
-  val data = session.sqlContext.read.textFile(config.getString(Consts.qfpTriplesPath))
+
+  import spark.implicits._
+  val data = spark.read.text(config.getString(Consts.qfpTriplesPath))
+
   
   def getObjectBySP(sp: String): String = {
     val searchStr = (sp + Consts.tripleFieldsSeparator + "-?\\d+").r

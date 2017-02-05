@@ -96,6 +96,10 @@ class StrQuery(config: Config) extends BaseQuery(config) {
     return result
   }
 
+  def executeQuery(): Boolean = {
+    true
+  }
+
   def executeQuery(spark: SparkSession): Boolean = {
     val triple = new SPO(
       config.getString(Consts.qfpTripleS),
